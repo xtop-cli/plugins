@@ -5,13 +5,54 @@ use ratatui::widgets::{Block, Borders, Paragraph};
 use regex::Regex;
 use std::collections::HashMap;
 use std::fmt::Debug;
-use xtop_plugin_api::model::ProcessInfo;
 use xtop_plugin_api::{
-    HostState, Plugin, PluginCapability, PluginContext, PluginError, PluginManifest,
-    WidgetRegistration,
+    HostState, Plugin, PluginCapability, PluginContext, PluginError, PluginManifest, PluginWidget,
+    ProcessInfo, SystemSnapshot,
 };
 
 use alert::{SamuraiAlert, Severity};
+
+// ---------------------------------------------------------------------------
+// Ecosystem constants (DR-6): single source for the plugin id and the
+// execute() action names. `xtop-extension-mcp` consumes these constants to
+// build its MCP tool table, so both repos stay compile-time-consistent.
+// ---------------------------------------------------------------------------
+
+/// Canonical plugin id of Samurai: the `manifest().id`, the registered
+/// widget name, and the plugin id external agents (kernel, `xtop-extension-mcp`)
+/// pass to `execute_plugin`.
+pub const PLUGIN_ID: &str = "samurai";
+
+/// The 12 action names `execute()` understands, as constants.
+pub mod actions {
+    /// High-level system summary (CPU, memory, disks, network, uptime).
+    pub const SYSTEM_SUMMARY: &str = "system.summary";
+    /// Top N processes by CPU usage, optional `,filter=<regex>`.
+    pub const PROCESSES_TOP: &str = "processes.top";
+    /// Regex search over selectable process fields.
+    pub const PROCESSES_SEARCH: &str = "processes.search";
+    /// Details for one PID.
+    pub const PROCESS_INFO: &str = "process.info";
+    /// Kill a process by PID (requires `KillProcesses`).
+    pub const PROCESS_KILL: &str = "process.kill";
+    /// The full heuristic alert list of the last analysis run.
+    pub const PROCESS_ALERTS: &str = "process.alerts";
+    /// Set CPU/mem/disk alert thresholds (requires `ModifyConfig`).
+    pub const THRESHOLD_SET: &str = "threshold.set";
+    /// Read current alert thresholds.
+    pub const THRESHOLD_GET: &str = "threshold.get";
+    /// Read runtime configuration.
+    pub const CONFIG_GET: &str = "config.get";
+    /// Update runtime configuration (requires `ModifyConfig`).
+    pub const CONFIG_SET: &str = "config.set";
+    /// Severity counts + top alerts of the last analysis run.
+    pub const ALERTS_STATUS: &str = "alerts.status";
+    /// Plugin-internal status (enabled, ticks, last action).
+    pub const PLUGIN_STATUS: &str = "plugin.status";
+}
+
+#[cfg(test)]
+mod tests;
 
 // ---------------------------------------------------------------------------
 // Known threat patterns (Rule 6)
@@ -169,15 +210,21 @@ impl SamuraiPlugin {
     // System summary
     // -----------------------------------------------------------------------
 
-    fn system_summary(&self, ctx: &PluginContext) -> String {
-        let snap = ctx.snapshot();
+    /// Read the system snapshot through the capability-gated context API.
+    fn read_system_snapshot(ctx: &PluginContext) -> Result<SystemSnapshot, PluginError> {
+        ctx.snapshot()
+            .map_err(|e| PluginError::Recoverable(format!("system snapshot unavailable: {e}")))
+    }
+
+    fn system_summary(&self, ctx: &PluginContext) -> Result<String, PluginError> {
+        let snap = Self::read_system_snapshot(ctx)?;
         let cpu_pct: f64 =
             snap.cpus.iter().map(|c| c.usage).sum::<f64>() / snap.cpus.len().max(1) as f64;
         let mem_gb = (snap.memory.used as f64 / 1073741824.0 * 10.0).round() / 10.0;
         let mem_total_gb = (snap.memory.total as f64 / 1073741824.0 * 10.0).round() / 10.0;
         let net_ifaces: Vec<&str> = snap.networks.iter().map(|n| n.name.as_str()).collect();
 
-        serde_json::to_string(&serde_json::json!({
+        Ok(serde_json::to_string(&serde_json::json!({
             "cpu_avg": (cpu_pct * 10.0).round() / 10.0,
             "mem_used_gb": mem_gb,
             "mem_total_gb": mem_total_gb,
@@ -189,7 +236,7 @@ impl SamuraiPlugin {
             "hostname": snap.sys_info.hostname,
             "alerts": self.alerts.len(),
         }))
-        .unwrap_or_default()
+        .unwrap_or_default())
     }
 
     // -----------------------------------------------------------------------
@@ -215,7 +262,7 @@ impl SamuraiPlugin {
         let re = Regex::new(pattern_str)
             .map_err(|e| PluginError::Recoverable(format!("invalid regex: {e}")))?;
 
-        let snap = ctx.snapshot();
+        let snap = Self::read_system_snapshot(ctx)?;
         let mut matched: Vec<ProcessInfo> = snap
             .processes
             .into_iter()
@@ -254,7 +301,7 @@ impl SamuraiPlugin {
         if count == 0 {
             return Err(PluginError::Recoverable("count must be > 0".into()));
         }
-        let snap = ctx.snapshot();
+        let snap = Self::read_system_snapshot(ctx)?;
         let mut procs: Vec<ProcessInfo> = snap.processes;
 
         if let Some(pattern) = filter_pattern {
@@ -275,7 +322,7 @@ impl SamuraiPlugin {
         let pid = pid_str
             .parse::<u32>()
             .map_err(|_| PluginError::Recoverable(format!("invalid pid: {pid_str}")))?;
-        let snap = ctx.snapshot();
+        let snap = Self::read_system_snapshot(ctx)?;
         let proc = snap
             .processes
             .iter()
@@ -578,8 +625,8 @@ impl SamuraiPlugin {
     // Main analyzer
     // -----------------------------------------------------------------------
 
-    fn analyze_processes(&mut self, ctx: &PluginContext) -> Vec<SamuraiAlert> {
-        let snap = ctx.snapshot();
+    fn analyze_processes(&mut self, ctx: &PluginContext) -> Result<Vec<SamuraiAlert>, PluginError> {
+        let snap = Self::read_system_snapshot(ctx)?;
         let mut alerts: Vec<SamuraiAlert> = Vec::new();
 
         // Build parent PID map for Rule 5
@@ -637,7 +684,7 @@ impl SamuraiPlugin {
         }
 
         alerts.truncate(MAX_ALERTS);
-        alerts
+        Ok(alerts)
     }
 
     fn parse_thresholds(params: &str) -> Result<(f64, f64, f64), PluginError> {
@@ -673,9 +720,9 @@ impl Debug for SamuraiPlugin {
 impl Plugin for SamuraiPlugin {
     fn manifest(&self) -> PluginManifest {
         PluginManifest {
-            id: "samurai".to_string(),
+            id: PLUGIN_ID.to_string(),
             name: "Samurai".to_string(),
-            version: "0.1.0".to_string(),
+            version: env!("CARGO_PKG_VERSION").to_string(),
             description: "AI-aware system monitoring, management, and heuristic threat detection"
                 .to_string(),
             capabilities: vec![
@@ -700,14 +747,14 @@ impl Plugin for SamuraiPlugin {
     fn on_tick(&mut self, ctx: &mut PluginContext) -> Result<(), PluginError> {
         self.tick_count += 1;
         if self.tick_count.is_multiple_of(5) {
-            self.alerts = self.analyze_processes(ctx);
+            self.alerts = self.analyze_processes(ctx)?;
         }
         Ok(())
     }
 
-    fn widget(&self) -> Option<WidgetRegistration> {
-        Some(WidgetRegistration {
-            name: "samurai".to_string(),
+    fn widget(&self) -> Option<PluginWidget> {
+        Some(PluginWidget {
+            name: PLUGIN_ID.to_string(),
             render: std::sync::Arc::new(
                 |f: &mut ratatui::Frame, _state: &dyn HostState, area: Rect| {
                     use xtop_plugin_api::hex_to_rgb;
@@ -729,14 +776,12 @@ impl Plugin for SamuraiPlugin {
                     let inner = block.inner(area);
                     f.render_widget(block, area);
 
-                    let chunks = Layout::default()
-                        .direction(Direction::Vertical)
-                        .constraints([
-                            Constraint::Length(1),
-                            Constraint::Length(1),
-                            Constraint::Min(0),
-                        ])
-                        .split(inner);
+                    let chunks = Layout::vertical([
+                        Constraint::Length(1),
+                        Constraint::Length(1),
+                        Constraint::Min(0),
+                    ])
+                    .split(inner);
 
                     let status =
                         Paragraph::new("Agent: monitoring for threats -- use MCP to interact")
@@ -762,11 +807,11 @@ impl Plugin for SamuraiPlugin {
         self.last_action = format!("{}({})", action, params);
 
         let result = match action {
-            "system.summary" => Ok(self.system_summary(ctx)),
-            "processes.top" => self.top_processes(ctx, params),
-            "processes.search" => self.search_processes(ctx, params),
-            "process.info" => self.process_info(ctx, params),
-            "process.kill" => {
+            actions::SYSTEM_SUMMARY => self.system_summary(ctx),
+            actions::PROCESSES_TOP => self.top_processes(ctx, params),
+            actions::PROCESSES_SEARCH => self.search_processes(ctx, params),
+            actions::PROCESS_INFO => self.process_info(ctx, params),
+            actions::PROCESS_KILL => {
                 let pid = params
                     .parse::<u32>()
                     .map_err(|_| PluginError::Recoverable(format!("invalid pid: {params}")))?;
@@ -779,12 +824,12 @@ impl Plugin for SamuraiPlugin {
                 }))
                 .unwrap_or_default())
             }
-            "process.alerts" => {
+            actions::PROCESS_ALERTS => {
                 let alerts_json: Vec<serde_json::Value> =
                     self.alerts.iter().map(Self::fmt_alert).collect();
                 Ok(serde_json::to_string(&alerts_json).unwrap_or_default())
             }
-            "threshold.set" => {
+            actions::THRESHOLD_SET => {
                 let (cpu, mem, disk) = Self::parse_thresholds(params)?;
                 ctx.set_alert_thresholds(cpu, mem, disk)
                     .map_err(|e| PluginError::Recoverable(e.to_string()))?;
@@ -793,7 +838,7 @@ impl Plugin for SamuraiPlugin {
                 }))
                 .unwrap_or_default())
             }
-            "threshold.get" => {
+            actions::THRESHOLD_GET => {
                 let alerts = ctx.alerts();
                 Ok(serde_json::to_string(&serde_json::json!({
                     "cpu": alerts.cpu_high,
@@ -802,7 +847,7 @@ impl Plugin for SamuraiPlugin {
                 }))
                 .unwrap_or_default())
             }
-            "config.get" => {
+            actions::CONFIG_GET => {
                 let cfg = ctx.config();
                 Ok(serde_json::to_string(&serde_json::json!({
                     "theme": cfg.theme,
@@ -812,7 +857,7 @@ impl Plugin for SamuraiPlugin {
                 }))
                 .unwrap_or_default())
             }
-            "config.set" => {
+            actions::CONFIG_SET => {
                 if let Some(val) = params.strip_prefix("interval_ms=") {
                     let ms = val.parse::<u64>().map_err(|e| {
                         PluginError::Recoverable(format!("invalid interval_ms: {e}"))
@@ -845,7 +890,7 @@ impl Plugin for SamuraiPlugin {
                     ))
                 }
             }
-            "alerts.status" => {
+            actions::ALERTS_STATUS => {
                 let critical = self
                     .alerts
                     .iter()
@@ -872,7 +917,7 @@ impl Plugin for SamuraiPlugin {
                 }))
                 .unwrap_or_default())
             }
-            "plugin.status" => {
+            actions::PLUGIN_STATUS => {
                 let critical = self
                     .alerts
                     .iter()

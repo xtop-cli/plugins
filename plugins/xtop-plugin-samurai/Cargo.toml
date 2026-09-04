@@ -3,12 +3,13 @@ name = "xtop-plugin-samurai"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+rust-version.workspace = true
 description = "AI-aware system resource monitoring and management plugin for xtop"
 repository = "https://github.com/xtop-cli/plugins"
 
 [dependencies]
 xtop-plugin-api.workspace = true
-ratatui = "0.29"
+ratatui.workspace = true
 regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
