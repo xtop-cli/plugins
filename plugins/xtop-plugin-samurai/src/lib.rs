@@ -454,7 +454,11 @@ impl SamuraiPlugin {
     }
 
     /// Rule 6: Known threat pattern (name or cmd matches miner/rootkit names).
-    fn rule_known_threat_pattern(&self, proc: &ProcessInfo) -> Option<SamuraiAlert> {
+    fn rule_known_threat_pattern(
+        &self,
+        proc: &ProcessInfo,
+        threat_cmds: &[Regex],
+    ) -> Option<SamuraiAlert> {
         let name_lower = proc.name.to_lowercase();
         if KNOWN_THREAT_NAMES.iter().any(|t| name_lower.contains(t)) {
             return Some(SamuraiAlert::new(
@@ -466,11 +470,7 @@ impl SamuraiPlugin {
             ));
         }
         let cmd_joined = proc.cmd_full.join(" ").to_lowercase();
-        if KNOWN_THREAT_CMDS.iter().any(|t| {
-            Regex::new(t)
-                .ok()
-                .is_some_and(|re| re.is_match(&cmd_joined))
-        }) {
+        if threat_cmds.iter().any(|re| re.is_match(&cmd_joined)) {
             return Some(SamuraiAlert::new(
                 "known_threat_pattern",
                 Severity::Critical,
@@ -483,20 +483,20 @@ impl SamuraiPlugin {
     }
 
     /// Rule 7: Suspicious pipe/download pattern in command line.
-    fn rule_suspicious_pipe_or_download(&self, proc: &ProcessInfo) -> Option<SamuraiAlert> {
+    fn rule_suspicious_pipe_or_download(
+        &self,
+        proc: &ProcessInfo,
+        pipe_re: &[Regex],
+    ) -> Option<SamuraiAlert> {
         let cmd_joined = proc.cmd_full.join(" ");
-        for pattern in PIPE_PATTERNS {
-            if let Ok(re) = Regex::new(pattern) {
-                if re.is_match(&cmd_joined) {
-                    return Some(SamuraiAlert::new(
-                        "suspicious_pipe_or_download",
-                        Severity::Critical,
-                        proc.pid,
-                        proc.name.clone(),
-                        format!("command matches pipe/download pattern: {}", proc.cmd),
-                    ));
-                }
-            }
+        if pipe_re.iter().any(|re| re.is_match(&cmd_joined)) {
+            return Some(SamuraiAlert::new(
+                "suspicious_pipe_or_download",
+                Severity::Critical,
+                proc.pid,
+                proc.name.clone(),
+                format!("command matches pipe/download pattern: {}", proc.cmd),
+            ));
         }
         None
     }
@@ -555,7 +555,10 @@ impl SamuraiPlugin {
             return None;
         }
         let entry = self.spawn_history.entry(proc.name.clone()).or_default();
-        entry.push((proc.pid, proc.start_time));
+        // The same pid reappears every tick while alive; count it once.
+        if !entry.iter().any(|(pid, _)| *pid == proc.pid) {
+            entry.push((proc.pid, proc.start_time));
+        }
         // Purge entries older than 120s
         entry.retain(|(_, start)| now_run_time.saturating_sub(*start) < 120);
         if entry.len() > 5 {
@@ -583,6 +586,17 @@ impl SamuraiPlugin {
         let parent_map: HashMap<u32, &ProcessInfo> =
             snap.processes.iter().map(|p| (p.pid, p)).collect();
 
+        // Compile once per analysis pass (not once per process per pass).
+        let threat_cmds: Vec<Regex> = KNOWN_THREAT_CMDS
+            .iter()
+            .filter_map(|p| Regex::new(p).ok())
+            .collect();
+        let pipe_re: Vec<Regex> = PIPE_PATTERNS
+            .iter()
+            .filter_map(|p| Regex::new(p).ok())
+            .collect();
+
+        // `start_time` (epoch seconds) and this clock share the same base.
         let now_run_time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -596,10 +610,10 @@ impl SamuraiPlugin {
             if let Some(a) = self.rule_masquerading(proc) {
                 alerts.push(a);
             }
-            if let Some(a) = self.rule_known_threat_pattern(proc) {
+            if let Some(a) = self.rule_known_threat_pattern(proc, &threat_cmds) {
                 alerts.push(a);
             }
-            if let Some(a) = self.rule_suspicious_pipe_or_download(proc) {
+            if let Some(a) = self.rule_suspicious_pipe_or_download(proc, &pipe_re) {
                 alerts.push(a);
             }
             if let Some(a) = self.rule_orphan_process(proc) {
