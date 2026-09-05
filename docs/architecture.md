@@ -16,7 +16,7 @@ The kernel hosts the plugin through `xtop-plugin-api`:
 
 | Hook | Behavior |
 |---|---|
-| `manifest()` | id `samurai` (= `PLUGIN_ID`), name `Samurai`, version from the crate version (`env!("CARGO_PKG_VERSION")`, currently 0.2.x), description, capabilities: `ReadSystemInfo`, `KillProcesses`, `ModifyConfig`, `RenderWidgets`. |
+| `manifest()` | id `samurai` (= `PLUGIN_ID`), name `Samurai`, version from the crate version (`env!("CARGO_PKG_VERSION")`), description, capabilities: `ReadSystemInfo`, `KillProcesses`, `ModifyConfig`, `RenderWidgets`. |
 | `on_enable()` | marks the plugin enabled. |
 | `on_disable()` | marks the plugin disabled. |
 | `on_tick()` | counts ticks; **every 5th tick** it replaces the alert list with a fresh analysis run (`tick_count % 5 == 0`). Analysis errors propagate as `PluginError` instead of being swallowed. |
