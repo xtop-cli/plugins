@@ -335,6 +335,25 @@ fn browser_child_skips_helpers_and_non_browser_parents() {
     assert!(p.rule_suspicious_child_of_browser(&child, &map).is_none());
 }
 
+#[test]
+fn browser_child_skips_webkit_helpers_on_macos() {
+    let safari = proc(12, "Safari");
+    let mut web_content = proc(14, "com.apple.WebKit.WebContent");
+    web_content.parent_pid = Some(12);
+    let mut networking = proc(15, "com.apple.WebKit.Networking");
+    networking.parent_pid = Some(12);
+    let snap = snapshot(vec![safari, web_content.clone(), networking.clone()]);
+    let map: std::collections::HashMap<u32, &ProcessInfo> =
+        snap.processes.iter().map(|p| (p.pid, p)).collect();
+    let p = plugin();
+    assert!(p
+        .rule_suspicious_child_of_browser(&web_content, &map)
+        .is_none());
+    assert!(p
+        .rule_suspicious_child_of_browser(&networking, &map)
+        .is_none());
+}
+
 // ---------------------------------------------------------------------------
 // Rule 6: known threat names / command patterns
 // ---------------------------------------------------------------------------
@@ -438,6 +457,10 @@ fn high_thread_skips_below_threshold_and_allowlisted_names() {
     let mut allowed = proc(52, "chrome");
     allowed.thread_count = 600;
     assert!(plugin().rule_high_thread_anomaly(&allowed).is_none());
+
+    let mut window_server = proc(53, "WindowServer");
+    window_server.thread_count = 900;
+    assert!(plugin().rule_high_thread_anomaly(&window_server).is_none());
 }
 
 #[test]

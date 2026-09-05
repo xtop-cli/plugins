@@ -114,6 +114,7 @@ const BROWSER_HELPERS: &[&str] = &[
     "utility",
     "crashpad",
     "updater",
+    "webkit",
 ];
 
 /// Pipe/download patterns for Rule 7.
@@ -131,8 +132,21 @@ const PIPE_PATTERNS: &[&str] = &[
 
 /// High-thread-count processes that are allowed (Rule 8).
 const ALLOWED_HIGH_THREAD: &[&str] = &[
-    "chrome", "firefox", "code", "Code", "idea", "java", "dotnet", "python", "node", "mysqld",
-    "postgres", "Xorg", "dockerd",
+    "chrome",
+    "firefox",
+    "code",
+    "Code",
+    "idea",
+    "java",
+    "dotnet",
+    "python",
+    "node",
+    "mysqld",
+    "postgres",
+    "Xorg",
+    "dockerd",
+    // macOS system processes with legitimately high thread counts.
+    "windowserver",
 ];
 
 /// Maximum alerts per cycle
