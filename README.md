@@ -1,4 +1,5 @@
-# xtop plugins
+<h1 align="center">
+<img src="https://raw.githubusercontent.com/xtop-cli/web/main/public/img/logo.png" width="100px" alt="Xtop logo" />Plugins</h1>
 
 Official repository for native and community Xtop plugins.
 
