@@ -1,0 +1,5 @@
+# Build artifacts of the guest example workspace (wasm32 target dir).
+/target
+
+# Compiled freestanding C widgets (rebuild with c-*/build.sh).
+c-*/*.wasm

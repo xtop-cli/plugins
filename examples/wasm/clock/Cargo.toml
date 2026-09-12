@@ -1,0 +1,14 @@
+[package]
+name = "xtop-wasm-example-clock"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Example xtop WASM widget: UTC clock driven by the host-provided unix time"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+xtop-wasm-guest.workspace = true

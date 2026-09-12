@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+members = ["clock", "cpu", "procs", "load-stats"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/xtop-cli/plugins"
+publish = false
+
+[workspace.dependencies]
+xtop-wasm-guest = { path = "../../plugins/xtop-wasm-guest" }
+
+# WASM guests are size-sensitive: optimize for size, abort on panic (no
+# unwinding support on wasm32-unknown-unknown) and strip symbols.
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

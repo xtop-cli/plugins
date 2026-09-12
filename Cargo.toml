@@ -2,7 +2,13 @@
 resolver = "2"
 members = [
     "plugins/xtop-plugin-samurai",
+    "plugins/xtop-plugin-wasm",
+    "plugins/xtop-plugin-external",
+    "plugins/xtop-wasm-contract",
+    "plugins/xtop-wasm-guest",
+    "plugins/xtop-widget-replay",
 ]
+exclude = ["examples/wasm"]
 
 [workspace.package]
 version = "0.1.0"
@@ -12,4 +18,11 @@ rust-version = "1.87"
 
 [workspace.dependencies]
 xtop-plugin-api = { git = "https://github.com/xtop-cli/api" }
+xtop-widget-api = { git = "https://github.com/xtop-cli/api" }
+xtop-wasm-contract = { path = "plugins/xtop-wasm-contract" }
+xtop-wasm-guest = { path = "plugins/xtop-wasm-guest" }
+xtop-widget-replay = { path = "plugins/xtop-widget-replay" }
 ratatui = "0.30.2"
+wasmi = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
