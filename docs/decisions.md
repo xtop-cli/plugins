@@ -75,7 +75,8 @@ Adopt alternative 5.
 - Per-tick payload bound: `max_processes` (default 50, clamped 1–4096),
   CPU-descending sort before truncation.
 - Distribution: the hosts live in this repo; the kernel consumes them as git
-  dependencies once pushed (temporary path deps during development).
+  dependencies (`xtop-cli/plugins`), so a clean kernel checkout builds
+  without sibling repos.
 
 ### Consequences
 
@@ -105,6 +106,6 @@ Adopt alternative 5.
   compatibility surface.
 - Operations: config-dir discovery, env overrides, and `--all-features`
   now pulls wasmi and process spawning (installation docs say so).
-- Release: the kernel currently references both hosts with path deps
-  (`../plugins/plugins/...`); they must become git deps once this repo is
-  pushed. `Cargo.lock` records them as path sources until then.
+- Release: the kernel consumes both hosts as git dependencies
+  (`https://github.com/xtop-cli/plugins`); there is no path-dependency window
+  to revert.
