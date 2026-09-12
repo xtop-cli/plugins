@@ -1,0 +1,13 @@
+[package]
+name = "xtop-wasm-guest"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Guest SDK for writing xtop runtime widgets in Rust and compiling them to wasm32"
+repository = "https://github.com/xtop-cli/plugins"
+
+[dependencies]
+xtop-wasm-contract.workspace = true
+serde.workspace = true
+serde_json.workspace = true

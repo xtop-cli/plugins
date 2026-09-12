@@ -1,0 +1,16 @@
+[package]
+name = "xtop-plugin-external"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "xtop runtime widget host: runs helper processes (Lua, Python, Node, any language) over line-delimited JSON"
+repository = "https://github.com/xtop-cli/plugins"
+
+[dependencies]
+xtop-plugin-api.workspace = true
+xtop-wasm-contract.workspace = true
+xtop-widget-replay.workspace = true
+ratatui.workspace = true
+serde.workspace = true
+serde_json.workspace = true

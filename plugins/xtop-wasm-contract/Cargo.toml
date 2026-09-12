@@ -1,0 +1,14 @@
+[package]
+name = "xtop-wasm-contract"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Serializable render/state contract shared by xtop runtime widget hosts and guests (WASM and external processes)"
+repository = "https://github.com/xtop-cli/plugins"
+
+[dependencies]
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

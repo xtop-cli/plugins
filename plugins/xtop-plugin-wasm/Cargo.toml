@@ -1,0 +1,20 @@
+[package]
+name = "xtop-plugin-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "xtop runtime widget host: loads sandboxed WASM widgets (wasmi) discovered in the user config dir"
+repository = "https://github.com/xtop-cli/plugins"
+
+[dependencies]
+xtop-plugin-api.workspace = true
+xtop-wasm-contract.workspace = true
+xtop-widget-replay.workspace = true
+ratatui.workspace = true
+wasmi.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+wat = "1"
