@@ -48,7 +48,9 @@ path, so a runtime widget takes precedence over every compiled-in pack:
 Neither feature is part of the default `xtop` build. Working examples live in
 [`examples/`](examples/): Rust WASM guests in
 [`examples/wasm/`](examples/wasm/) and Lua/Python/Node helper processes in
-[`examples/external/`](examples/external/). The rationale and trade-offs are
+[`examples/external/`](examples/external/). Demo layouts that arrange these
+widgets live in the `xtop-cli/layouts` repo under `layouts/custom/` and
+install with `xtop layout install <name>`. The rationale and trade-offs are
 recorded in [docs/decisions.md](docs/decisions.md) (ADR-001).
 
 ## Getting started (development)
