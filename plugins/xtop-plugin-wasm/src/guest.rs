@@ -14,6 +14,13 @@ use wasmi::{
 /// Linear-memory cap per guest instance (64 MiB).
 const MEMORY_LIMIT: usize = 64 * 1024 * 1024;
 
+/// Cap on one `host.log` message copied out of guest memory. Guest-controlled
+/// lengths must never size a host-side allocation directly.
+const MAX_LOG_LEN: usize = 16 * 1024;
+
+/// Cap on a manifest/draw-list payload read back from a guest.
+const MAX_RESULT_LEN: usize = MEMORY_LIMIT;
+
 /// Fuel budget for one host→guest call sequence. wasmi charges fuel per
 /// executed instruction; 100M covers a release-built JSON parse + render of a
 /// large snapshot with a wide margin while still bounding runaway loops.
@@ -73,7 +80,8 @@ impl Guest {
                 if ptr <= 0 || len <= 0 {
                     return;
                 }
-                let mut buf = vec![0u8; len as usize];
+                let len = (len as usize).min(MAX_LOG_LEN);
+                let mut buf = vec![0u8; len];
                 let message = match caller.get_export("memory") {
                     Some(Extern::Memory(memory)) => {
                         match memory.read(&caller, ptr as usize, &mut buf) {
@@ -191,7 +199,13 @@ impl Guest {
         if len <= 0 {
             return Err("guest returned an empty result".to_string());
         }
-        let mut buf = vec![0u8; len as usize];
+        let len = len as usize;
+        if len > MAX_RESULT_LEN {
+            return Err(format!(
+                "guest result is too large ({len} bytes, limit {MAX_RESULT_LEN})"
+            ));
+        }
+        let mut buf = vec![0u8; len];
         self.memory
             .read(&self.store, ptr as usize, &mut buf)
             .map_err(|e| format!("result read error: {e}"))?;

@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+Security-hardening pass (release/v0.1.0 branch):
+
+- WASM host caps guest-controlled host allocations (log/result payloads).
+- External widget host adds a total request deadline, response-size cap and
+  log-line limit.
+
 ## [0.1.0] - 2026-09-12
 
 Version policy note: the ecosystem stays early — everything is 0.1.0. This

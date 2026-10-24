@@ -37,7 +37,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use xtop_plugin_api::{
@@ -53,6 +53,13 @@ pub const DIR_ENV: &str = "XTOP_EXTERNAL_DIR";
 pub const DIR_NAME: &str = "external";
 
 const DEFAULT_TIMEOUT_MS: u64 = 2000;
+
+/// Maximum log lines accepted before a real response. Keeps a chatty (or
+/// hostile) process from monopolising a tick or growing the channel forever.
+const MAX_LOG_LINES: usize = 1000;
+
+/// Maximum response line accepted from a helper process.
+const MAX_RESPONSE_LEN: usize = 1024 * 1024;
 
 /// One `<name>.json` descriptor.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -215,14 +222,36 @@ impl ExternalWidgetPlugin {
             .map_err(|e| format!("flush to process failed: {e}"))?;
 
         let timeout = Duration::from_millis(self.config.timeout_ms);
+        let deadline = Instant::now() + timeout;
+        let mut log_lines = 0usize;
         loop {
-            match self.lines.recv_timeout(timeout) {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return Err(format!(
+                    "timed out after {} ms waiting for the process",
+                    self.config.timeout_ms
+                ));
+            }
+            match self.lines.recv_timeout(remaining) {
                 Ok(line) => {
+                    if line.len() > MAX_RESPONSE_LEN {
+                        return Err(format!(
+                            "response line is too large ({} bytes, limit {MAX_RESPONSE_LEN})",
+                            line.len()
+                        ));
+                    }
                     if line.trim().is_empty() {
                         continue;
                     }
                     match serde_json::from_str::<contract::Response>(&line) {
                         Ok(contract::Response::Log { message }) => {
+                            log_lines += 1;
+                            if log_lines > MAX_LOG_LINES {
+                                return Err(format!(
+                                    "process sent more than {MAX_LOG_LINES} log lines \
+                                     without a response"
+                                ));
+                            }
                             eprintln!("[external:{}] {message}", self.config.name);
                         }
                         Ok(response) => return Ok(response),
