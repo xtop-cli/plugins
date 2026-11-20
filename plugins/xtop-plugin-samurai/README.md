@@ -138,4 +138,4 @@ cargo build --workspace
 
 ## License
 
-MIT
+GPL-3.0-or-later. See the repository [LICENSE](../../LICENSE).

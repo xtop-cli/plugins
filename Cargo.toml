@@ -13,14 +13,13 @@ exclude = ["examples/wasm"]
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
+license = "GPL-3.0-or-later"
 rust-version = "1.87"
 
 [workspace.dependencies]
 xtop-plugin-api = { git = "https://github.com/xtop-cli/api" }
 xtop-widget-api = { git = "https://github.com/xtop-cli/api" }
 xtop-wasm-contract = { path = "plugins/xtop-wasm-contract" }
-xtop-wasm-guest = { path = "plugins/xtop-wasm-guest" }
 xtop-widget-replay = { path = "plugins/xtop-widget-replay" }
 ratatui = "0.30.2"
 wasmi = "2"
