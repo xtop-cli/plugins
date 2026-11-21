@@ -50,7 +50,7 @@ Neither feature is part of the default `xtop` build. Working examples live in
 [`examples/wasm/`](examples/wasm/) and Lua/Python/Node helper processes in
 [`examples/external/`](examples/external/). Demo layouts that arrange these
 widgets live in the `xtop-cli/layouts` repo under `layouts/custom/` and
-install with `xtop layout install <name>`. The rationale and trade-offs are
+install with `xtop layout download <name>` (or the `install` alias). The rationale and trade-offs are
 recorded in [docs/decisions.md](docs/decisions.md) (ADR-001).
 
 ## Getting started (development)
@@ -74,4 +74,4 @@ extensions/
 
 ## License
 
-MIT
+GPL-3.0-or-later. See [LICENSE](LICENSE). User contributions remain under the license chosen by their authors; see the license note.
