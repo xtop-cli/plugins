@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-21
+
+- Relicensed Xscriptor-authored material under GPL-3.0-or-later; user
+  contributions keep the license chosen by their authors.
+- Removed the unused `xtop-wasm-guest` root workspace dependency.
+
 ## [0.1.0] - 2026-09-12
 
 Version policy note: the ecosystem stays early — everything is 0.1.0. This
